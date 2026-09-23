@@ -2,7 +2,7 @@
 
 > Qoder 桌面端 token 消费计量插件：同时覆盖 **Qoder 官方模型** 与 **自定义模型（BYOK / custom_model）**，支持按天 / 模型 / 项目聚合、官网价费用换算（**可自动更新最新官网价**），一键生成 **可视化 HTML 仪表盘** 与 **IDE 内 Canvas 仪表盘**，并在任意工作区提供 `/token-usage` 与 `/update-pricing` 斜杠命令。
 
-- 版本 0.3.1 ｜ 许可 MIT ｜ 运行环境 Python 3.8+（仅标准库，无第三方依赖）
+- 版本 0.3.2 ｜ 许可 MIT ｜ 运行环境 Python 3.8+（仅标准库，无第三方依赖）
 - 支持 Qoder 桌面端：macOS / Windows / Linux
 
 ## 为什么需要它
@@ -126,6 +126,7 @@ Windows 上将 `python3` 换成 `python` 或 `py -3`。
 
 ## 更新记录
 
+- 0.3.2（2026-09-23）：修复中文（非 ASCII）工作区路径下 Canvas 画布写入目录与 Qoder 客户端不一致的问题——Qoder 客户端把工作区路径中所有非字母数字字符替换为 `-`，旧版脚本只替换 `/`（保留中文），两套规则分裂导致画布写入错误目录、点击画布链接报「文件不存在或无法访问。」；现统一为 `[^a-zA-Z0-9] → -` 规则（ASCII 路径行为不变）。
 - 0.3.1（2026-09-23）：扩充国际模型参考价——`_otherCustomModels` 备选参考价由 18 款增至 30 款，新增 OpenAI（GPT-6 Astra / Sol / Luna、GPT-5.3 Codex）、Anthropic（Fable 5.1 / Opus 5.5 / Sonnet 5 / Haiku 4.5）、Google（Gemini 3.8 Flash / 3.1 Pro Preview）、xAI（Grok 4.7 / Build 0.1）共 12 款；国际厂商为美元官网价（note 内标注原价），按参考汇率 6.70 折算，价格均经官网复核（2026-09-23）。
 - 0.3.0（2026-09-23）：新增**模型价格自动更新**——`update_pricing.py` 从插件公开仓库（Gitee 优先 / GitHub 兜底）同步最新官网参考价：结构 + 数值校验、原子写入、自动备份（保留 3 份）、24h 节流、失败重试窗口、离线开关（`--offline` / `TOKEN_USAGE_NO_NET=1`）；新增 `/update-pricing` 斜杠命令；`/token-usage` 流程加入价格自检；`pricing.json` 新增 `_version` 版本字段。
 - 0.2.1（2026-09-23）：扩充计费模型范围——`_otherCustomModels` 备选参考价由 5 款增至 18 款，覆盖 DeepSeek / Kimi / 通义千问 / 智谱 GLM / 豆包 / MiniMax（新增 Kimi-K2.7-Code / HighSpeed / K2.6、Qwen-3.7-Plus / 3.8-Flash、GLM-5.3 / 5.2 / 5.3-Flash、Doubao-Seed-2.1-Pro / Turbo / Evolving、MiniMax-M3 / M2.7），价格均经官网复核（2026-09-23）。
@@ -147,4 +148,5 @@ Windows 上将 `python3` 换成 `python` 或 `py -3`。
 - **0.3.0 价格自动更新实测**（2026-09-23，macOS，对插件仓库副本联网执行）：① 真更新链路——本地无版本旧表 → 远端 v2026.09.23（Gitee 源，302 跳转跟随成功），原子写入 + 自动备份（`pricing.json.bak-<时间戳>`）+ 状态记录，退出码 0；② 权限保持——原文件 644，更新后仍 644；③ 节流——24h 窗口内成功状态重复执行毫秒级跳过（不联网）；④ 已是最新——`--check --force` 判定 up-to-date（本地/远端均 v2026.09.23）；⑤ JSON 输出——`--json` 结构完整（status / local_version / remote_version / source / changes）；⑥ 离线开关——`--offline` 直接退出（exit 0）、`TOKEN_USAGE_NO_NET=1` 等效；⑦ 双源——Gitee（默认首源）与 GitHub raw（`--source` 直指）均拉取成功；⑧ 坏数据拒绝——币种错误 / 版本格式错 / 数值非法时 exit 1 且原文件 SHA-256 不变。
 - **0.3.0 插件结构校验**（2026-09-23）：`validate_qoder_plugin.py` 对 0.3.0 插件目录复验通过（OK: no issues found）。
 - **0.3.1 国际模型定价校验**（2026-09-23）：`_otherCustomModels` 新增 12 款国际模型（OpenAI GPT-6 Astra / Sol / Luna、GPT-5.3 Codex；Anthropic Fable 5.1 / Opus 5.5 / Sonnet 5 / Haiku 4.5；Google Gemini 3.8 Flash / 3.1 Pro Preview；xAI Grok 4.7 / Build 0.1），价格逐条对照官网原文（platform.openai.com / anthropic.com / ai.google.dev / docs.x.ai，经官网抓取复核）；美元官网价按 2026-09-23 参考汇率 6.70 折算（note 内保留美元原价）；`validate_pricing` 对新表全量校验通过；`usage_report.py` 以 Sonnet 5 价替换 custom_model 后对真实数据库复跑，费用列正确变化（DeepSeek-Flash ¥21.43 → Sonnet 5 ¥305.93）；`validate_qoder_plugin.py` 对 0.3.1 插件目录复验通过（OK: no issues found）。
+- **0.3.2 中文路径 slug 修复验证**（2026-09-23）：`project_slug` 按 Qoder 客户端规则（非 `[A-Za-z0-9]` 全替换为 `-`）重写后，对中文路径 `/Users/dgjin/dgjinapp/智能问数据分析系统` 输出 `-Users-dgjin-dgjinapp----------`，与 `~/.qoder/projects/` 实际目录名逐字符一致；ASCII 路径（apphub / qoder-token-usage 等）输出与旧规则一致（行为不变）；以真实数据库复跑 `build_canvas.py --workspace <中文路径>`，画布成功写入 `~/.qoder/projects/-Users-dgjin-dgjinapp----------/canvases/`（37.2 KB，含 status.json）；`validate_qoder_plugin.py` 对 0.3.2 复验通过（OK: no issues found）。
 - **平台说明**：以上实测在 macOS 完成；Windows / Linux 的数据库探测、浏览器打开与路径处理为按平台约定实现，尚未在对应系统实测。

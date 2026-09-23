@@ -23,6 +23,7 @@ KPI / 每日 Token 堆叠柱 / 每日费用折线 / 模型分布 / 项目排行 
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -63,9 +64,13 @@ def parse_args():
 
 
 def project_slug(path):
-    """工作区绝对路径 -> Qoder 项目目录 slug（分隔符统一为 /，去掉盘符冒号后替换为 -，前加 -）。"""
+    """工作区绝对路径 -> Qoder 项目目录 slug：去掉盘符冒号后，所有非字母数字字符替换为 -，前加 -。
+
+    与 Qoder 客户端实际规则保持一致（全部非 [A-Za-z0-9] 字符替换为 -，
+    中文等非 ASCII 字符同样替换），避免中文路径下目录分裂。
+    """
     p = os.path.abspath(os.path.expanduser(path)).replace("\\", "/").replace(":", "")
-    return "-" + p.strip("/").replace("/", "-")
+    return "-" + re.sub(r"[^a-zA-Z0-9]", "-", p.strip("/"))
 
 
 def build_days(rows, pricing):

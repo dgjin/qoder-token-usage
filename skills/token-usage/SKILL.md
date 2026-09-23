@@ -1,6 +1,6 @@
 ---
 name: token-usage
-version: 0.3.1
+version: 0.3.2
 description: 统计 Qoder 桌面端的 token 消费计量——同时覆盖 Qoder 官方模型额度与自定义模型（BYOK / custom_model）。数据来自 Qoder 本地数据库（每条消息的 token 明细：输入/输出/缓存命中），支持按天、按模型、按项目聚合，可按 pricing.json 中内置的国产 + 国际模型官网单价换算参考费用，并一键自动更新官网价（update_pricing.py），可生成可视化 HTML 仪表盘与 Qoder IDE 内 Canvas 仪表盘，并提供 /token-usage 斜杠命令在任意工作区一键刷新。Use when the user asks about Qoder token 消费/用量统计（含自定义模型）, "我这周用了多少 token", token usage / token cost / credits 消耗报告, 统计 token 消费, 查看用量, custom model 用量, 可视化查看用量/账单, 更新模型价格, 或需要导出用量报表与仪表盘时。
 description_zh: 统计 Qoder 桌面端 token 消费（官方模型 + 自定义模型），支持费用换算（内置 30 款国产 + 国际模型官网价、可自动更新）、可视化 HTML 仪表盘与 IDE 内 Canvas 仪表盘，任意工作区可用 /token-usage 与 /update-pricing 斜杠命令。
 user-invocable: true
