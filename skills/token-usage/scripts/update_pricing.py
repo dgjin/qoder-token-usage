@@ -289,12 +289,17 @@ def backup(path, keep):
 
 
 def write_atomic(path, text):
-    """原子写入：临时文件 + os.replace（避免半写状态）。"""
+    """原子写入：临时文件 + os.replace（避免半写状态）；保持原文件权限。"""
     d = os.path.dirname(os.path.abspath(path)) or "."
+    try:
+        mode = os.stat(path).st_mode & 0o777
+    except OSError:
+        mode = 0o644
     fd, tmp = tempfile.mkstemp(prefix=".pricing-tmp-", dir=d)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
+        os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:
         try:
