@@ -61,7 +61,7 @@
     }
   },
   "_otherCustomModels": {
-    "_usage": "你配置的自定义模型备选参考价（官网 2026-09-23 获取；覆盖 DeepSeek / Kimi / 通义千问 / 智谱 GLM / 豆包 / MiniMax 等 18 款常用模型）。切换主力模型时，把对应价格复制到 models.custom_model（峰谷结构照抄）。",
+    "_usage": "你配置的自定义模型备选参考价（官网 2026-09-23 获取；覆盖 DeepSeek / Kimi / 通义千问 / 智谱 GLM / 豆包 / MiniMax 及 OpenAI / Anthropic / Google / xAI 国际模型等 30 款常用模型）。切换主力模型时，把对应价格复制到 models.custom_model（峰谷结构照抄）。国际厂商为美元官网价、按参考汇率 6.70 折算的人民币参考值（note 内为美元原价），实际以账单为准。",
     "deepseek-flash": {
       "display_name": "DeepSeek-Flash",
       "peak": { "input": 2, "output": 8, "cached": 0.04 },
@@ -196,6 +196,102 @@
       "cached": 0.42,
       "source": "https://platform.minimax.cn/docs/guides/pricing-paygo",
       "note": "缓存写入另计 ¥2.625/百万（官方）"
+    },
+    "gpt-6-astra": {
+      "display_name": "GPT-6 Astra（OpenAI）",
+      "input": 67,
+      "output": 335,
+      "cached": 6.7,
+      "source": "https://platform.openai.com/docs/pricing",
+      "note": "USD $10/$50/$1 per 1M（长上下文档 $20/$75/$2）"
+    },
+    "gpt-6-sol": {
+      "display_name": "GPT-6 Sol（OpenAI）",
+      "input": 13.4,
+      "output": 67,
+      "cached": 1.34,
+      "source": "https://platform.openai.com/docs/pricing",
+      "note": "USD $2/$10/$0.2 per 1M（长上下文档 $4/$15/$0.4）"
+    },
+    "gpt-6-luna": {
+      "display_name": "GPT-6 Luna（OpenAI）",
+      "input": 0.67,
+      "output": 3.35,
+      "cached": 0.067,
+      "source": "https://platform.openai.com/docs/pricing",
+      "note": "USD $0.1/$0.5/$0.01 per 1M（长上下文档 $0.2/$0.75/$0.02）"
+    },
+    "gpt-5.3-codex": {
+      "display_name": "GPT-5.3 Codex（OpenAI）",
+      "input": 11.73,
+      "output": 93.8,
+      "cached": 1.17,
+      "source": "https://platform.openai.com/docs/pricing",
+      "note": "USD $1.75/$14/$0.175 per 1M；编码（Codex）专用"
+    },
+    "claude-fable-5.1": {
+      "display_name": "Fable 5.1（Anthropic）",
+      "input": 67,
+      "output": 335,
+      "cached": 1.68,
+      "source": "https://www.anthropic.com/pricing",
+      "note": "USD $10/$50/$0.25 per 1M；缓存写入 $12.5 另计（本地数据不含该口径）"
+    },
+    "claude-opus-5.5": {
+      "display_name": "Opus 5.5（Anthropic）",
+      "input": 26.8,
+      "output": 134,
+      "cached": 1.34,
+      "source": "https://www.anthropic.com/pricing",
+      "note": "USD $4/$20/$0.2 per 1M；缓存写入 $5 另计"
+    },
+    "claude-sonnet-5": {
+      "display_name": "Sonnet 5（Anthropic）",
+      "input": 13.4,
+      "output": 67,
+      "cached": 1.34,
+      "source": "https://www.anthropic.com/pricing",
+      "note": "USD $2/$10/$0.2 per 1M；缓存写入 $2.5 另计"
+    },
+    "claude-haiku-4.5": {
+      "display_name": "Haiku 4.5（Anthropic）",
+      "input": 6.7,
+      "output": 33.5,
+      "cached": 0.67,
+      "source": "https://www.anthropic.com/pricing",
+      "note": "USD $1/$5/$0.1 per 1M；缓存写入 $1.25 另计"
+    },
+    "gemini-3.8-flash": {
+      "display_name": "Gemini 3.8 Flash（Google）",
+      "input": 5.03,
+      "output": 25.1,
+      "cached": 0.5,
+      "source": "https://ai.google.dev/gemini-api/docs/pricing",
+      "note": "USD $0.75/$3.75/$0.075 per 1M；促销价至 2026-12-31（2027 起 $1.5/$7.5/$0.15）；缓存存储另计"
+    },
+    "gemini-3.1-pro": {
+      "display_name": "Gemini 3.1 Pro Preview（Google）",
+      "input": 13.4,
+      "output": 80.4,
+      "cached": 1.34,
+      "source": "https://ai.google.dev/gemini-api/docs/pricing",
+      "note": "USD $2/$12/$0.2 per 1M（≤200k 输入档；>200k 档 $4/$18/$0.4）；缓存存储另计"
+    },
+    "grok-4.7": {
+      "display_name": "Grok 4.7（xAI）",
+      "input": 13.4,
+      "output": 40.2,
+      "cached": 3.35,
+      "source": "https://docs.x.ai/developers/pricing",
+      "note": "USD $2/$6/$0.5 per 1M（<200k 输入档；≥200k 档 $4/$12/$1）"
+    },
+    "grok-build-0.1": {
+      "display_name": "Grok Build 0.1（xAI）",
+      "input": 6.7,
+      "output": 13.4,
+      "cached": 1.34,
+      "source": "https://docs.x.ai/developers/pricing",
+      "note": "USD $1/$2/$0.2 per 1M（<200k 输入档；≥200k 档 $2/$4/$0.4）；编码/构建专用"
     }
   }
 }

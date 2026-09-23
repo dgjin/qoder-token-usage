@@ -2,7 +2,7 @@
 
 > Qoder 桌面端 token 消费计量插件：同时覆盖 **Qoder 官方模型** 与 **自定义模型（BYOK / custom_model）**，支持按天 / 模型 / 项目聚合、官网价费用换算（**可自动更新最新官网价**），一键生成 **可视化 HTML 仪表盘** 与 **IDE 内 Canvas 仪表盘**，并在任意工作区提供 `/token-usage` 与 `/update-pricing` 斜杠命令。
 
-- 版本 0.3.0 ｜ 许可 MIT ｜ 运行环境 Python 3.8+（仅标准库，无第三方依赖）
+- 版本 0.3.1 ｜ 许可 MIT ｜ 运行环境 Python 3.8+（仅标准库，无第三方依赖）
 - 支持 Qoder 桌面端：macOS / Windows / Linux
 
 ## 为什么需要它
@@ -17,7 +17,7 @@
 |---|---|
 | 双通道计量 | 官方模型档位（qmodel/cmodel/gmodel/kmodel/lite/auto 等）+ 自定义模型（`custom_model`） |
 | 多维聚合 | 按天 / 按模型 / 按项目，输出消息数、输入/输出/缓存 tokens、参考费用 |
-| 费用换算 | `pricing.json` 内置 18 款常用模型官网价（2026-09-23 获取）；DeepSeek 系列按消息时间自动判峰谷（高峰=北京时间周一至周五 9:00-12:00、14:00-18:00） |
+| 费用换算 | `pricing.json` 内置 30 款常用模型官网价（含 OpenAI / Anthropic / Google / xAI 国际模型，2026-09-23 获取）；DeepSeek 系列按消息时间自动判峰谷（高峰=北京时间周一至周五 9:00-12:00、14:00-18:00） |
 | 价格自动更新 | `update_pricing.py`：从插件公开仓库（Gitee / GitHub 双源）同步最新官网参考价——结构校验 + 原子写入 + 自动备份 + 24h 节流 + 离线开关，支持 `--check` / `--dry-run` |
 | 可视化仪表盘 | 自包含 HTML：KPI 总览、每日用量堆叠柱、每日费用折线、模型分布、项目排行、明细表；近 7/30/90 天与全部历史四档切换，无外部依赖，双击即开 |
 | Canvas 仪表盘 | Qoder IDE 内直接打开：`build_canvas.py` 生成 `.canvas.tsx` 到当前工作区的画布目录，Canvas 面板 / 对话链接点击即看，范围切换偏好持久记忆 |
@@ -103,12 +103,12 @@ Windows 上将 `python3` 换成 `python` 或 `py -3`。
 
 ## 费用换算（pricing.json）
 
-`pricing.json` 已内置 18 款常用模型官网参考价（2026-09-23 获取），统计时直接输出预估费用；价格表可自动更新：
+`pricing.json` 已内置 30 款常用模型官网参考价（含 OpenAI / Anthropic / Google / xAI 国际模型，2026-09-23 获取），统计时直接输出预估费用；价格表可自动更新：
 
 - 两种价格结构：flat（`input / output / cached`）或峰谷分时（`peak / offpeak`）；DeepSeek 系列按每条消息的时间自动判断高峰/空闲。
-- 自定义模型默认按 **DeepSeek-Flash** 计价；主力模型变化时，把 `_otherCustomModels` 里对应价格（已备好 18 款常用模型：DeepSeek / Kimi / 通义千问 / 智谱 GLM / 豆包 / MiniMax）复制到 `models.custom_model` 覆盖即可。
+- 自定义模型默认按 **DeepSeek-Flash** 计价；主力模型变化时，把 `_otherCustomModels` 里对应价格（已备好 30 款常用模型：DeepSeek / Kimi / 通义千问 / 智谱 GLM / 豆包 / MiniMax 及 OpenAI / Anthropic / Google / xAI 国际模型；国际厂商为美元官网价、按参考汇率 6.70 折算，note 内为美元原价）复制到 `models.custom_model` 覆盖即可。
 - Qoder 官方档位无公开单价映射，费用列显示 `-`（以 Credits 口径为准）。
-- 价格来源（如官网调整以官网为准）：[DeepSeek](https://api-docs.deepseek.com/zh-cn/quick_start/pricing) ｜ [Kimi](https://platform.moonshot.cn/docs/pricing/chat) ｜ [阿里云百炼](https://help.aliyun.com/zh/model-studio/model-pricing) ｜ [智谱](https://docs.bigmodel.cn/cn/guide/start/pricing) ｜ [豆包/火山方舟](https://www.volcengine.com/docs/82379/1544106) ｜ [MiniMax](https://platform.minimax.cn/docs/guides/pricing-paygo)
+- 价格来源（如官网调整以官网为准）：[DeepSeek](https://api-docs.deepseek.com/zh-cn/quick_start/pricing) ｜ [Kimi](https://platform.moonshot.cn/docs/pricing/chat) ｜ [阿里云百炼](https://help.aliyun.com/zh/model-studio/model-pricing) ｜ [智谱](https://docs.bigmodel.cn/cn/guide/start/pricing) ｜ [豆包/火山方舟](https://www.volcengine.com/docs/82379/1544106) ｜ [MiniMax](https://platform.minimax.cn/docs/guides/pricing-paygo) ｜ [OpenAI](https://platform.openai.com/docs/pricing) ｜ [Anthropic](https://www.anthropic.com/pricing) ｜ [Gemini](https://ai.google.dev/gemini-api/docs/pricing) ｜ [xAI](https://docs.x.ai/developers/pricing)
 - **自动更新**：`python3 scripts/update_pricing.py` 从插件公开仓库（Gitee / GitHub 双源）同步最新价格表（结构校验 + 原子写入 + 自动备份 + 24h 节流；`--check` 只检查 / `--dry-run` 只看差异 / `--offline` 禁用联网）。
 - **维护者**：价格调整时更新仓库 `skills/token-usage/pricing.json` 的对应价格与顶层 `_version`（YYYY.MM.DD）后推送，用户端即可自动同步（无需等待插件版本升级）。
 
@@ -126,6 +126,7 @@ Windows 上将 `python3` 换成 `python` 或 `py -3`。
 
 ## 更新记录
 
+- 0.3.1（2026-09-23）：扩充国际模型参考价——`_otherCustomModels` 备选参考价由 18 款增至 30 款，新增 OpenAI（GPT-6 Astra / Sol / Luna、GPT-5.3 Codex）、Anthropic（Fable 5.1 / Opus 5.5 / Sonnet 5 / Haiku 4.5）、Google（Gemini 3.8 Flash / 3.1 Pro Preview）、xAI（Grok 4.7 / Build 0.1）共 12 款；国际厂商为美元官网价（note 内标注原价），按参考汇率 6.70 折算，价格均经官网复核（2026-09-23）。
 - 0.3.0（2026-09-23）：新增**模型价格自动更新**——`update_pricing.py` 从插件公开仓库（Gitee 优先 / GitHub 兜底）同步最新官网参考价：结构 + 数值校验、原子写入、自动备份（保留 3 份）、24h 节流、失败重试窗口、离线开关（`--offline` / `TOKEN_USAGE_NO_NET=1`）；新增 `/update-pricing` 斜杠命令；`/token-usage` 流程加入价格自检；`pricing.json` 新增 `_version` 版本字段。
 - 0.2.1（2026-09-23）：扩充计费模型范围——`_otherCustomModels` 备选参考价由 5 款增至 18 款，覆盖 DeepSeek / Kimi / 通义千问 / 智谱 GLM / 豆包 / MiniMax（新增 Kimi-K2.7-Code / HighSpeed / K2.6、Qwen-3.7-Plus / 3.8-Flash、GLM-5.3 / 5.2 / 5.3-Flash、Doubao-Seed-2.1-Pro / Turbo / Evolving、MiniMax-M3 / M2.7），价格均经官网复核（2026-09-23）。
 - 0.2.0（2026-09-23）：跨平台通用化——数据库路径自动探测（macOS/Windows/Linux）+ `QODER_DB_PATH` 覆盖；仪表盘默认输出与浏览器打开改用跨平台标准库；Canvas 项目目录 slug 归一化；斜杠命令跨安装根定位。
@@ -145,4 +146,5 @@ Windows 上将 `python3` 换成 `python` 或 `py -3`。
 - **0.2.1 定价扩充校验**（2026-09-23）：`_otherCustomModels` 18 款模型（DeepSeek / Kimi / 通义千问 / 智谱 GLM / 豆包 / MiniMax）价格均经官网原文复核；`pricing.json` 结构校验（JSON 有效性 + 各条目字段完整性）通过；插件离线校验器对插件目录复验通过；三大脚本从本机安装目录（0.2.1）复跑正常。
 - **0.3.0 价格自动更新实测**（2026-09-23，macOS，对插件仓库副本联网执行）：① 真更新链路——本地无版本旧表 → 远端 v2026.09.23（Gitee 源，302 跳转跟随成功），原子写入 + 自动备份（`pricing.json.bak-<时间戳>`）+ 状态记录，退出码 0；② 权限保持——原文件 644，更新后仍 644；③ 节流——24h 窗口内成功状态重复执行毫秒级跳过（不联网）；④ 已是最新——`--check --force` 判定 up-to-date（本地/远端均 v2026.09.23）；⑤ JSON 输出——`--json` 结构完整（status / local_version / remote_version / source / changes）；⑥ 离线开关——`--offline` 直接退出（exit 0）、`TOKEN_USAGE_NO_NET=1` 等效；⑦ 双源——Gitee（默认首源）与 GitHub raw（`--source` 直指）均拉取成功；⑧ 坏数据拒绝——币种错误 / 版本格式错 / 数值非法时 exit 1 且原文件 SHA-256 不变。
 - **0.3.0 插件结构校验**（2026-09-23）：`validate_qoder_plugin.py` 对 0.3.0 插件目录复验通过（OK: no issues found）。
+- **0.3.1 国际模型定价校验**（2026-09-23）：`_otherCustomModels` 新增 12 款国际模型（OpenAI GPT-6 Astra / Sol / Luna、GPT-5.3 Codex；Anthropic Fable 5.1 / Opus 5.5 / Sonnet 5 / Haiku 4.5；Google Gemini 3.8 Flash / 3.1 Pro Preview；xAI Grok 4.7 / Build 0.1），价格逐条对照官网原文（platform.openai.com / anthropic.com / ai.google.dev / docs.x.ai，经官网抓取复核）；美元官网价按 2026-09-23 参考汇率 6.70 折算（note 内保留美元原价）；`validate_pricing` 对新表全量校验通过；`usage_report.py` 以 Sonnet 5 价替换 custom_model 后对真实数据库复跑，费用列正确变化（DeepSeek-Flash ¥21.43 → Sonnet 5 ¥305.93）；`validate_qoder_plugin.py` 对 0.3.1 插件目录复验通过（OK: no issues found）。
 - **平台说明**：以上实测在 macOS 完成；Windows / Linux 的数据库探测、浏览器打开与路径处理为按平台约定实现，尚未在对应系统实测。
