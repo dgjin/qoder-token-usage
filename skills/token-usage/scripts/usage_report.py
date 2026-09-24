@@ -15,8 +15,10 @@ Qoder Token 消费统计 —— 同时覆盖 Qoder 官方模型与自定义模�
 用法：
   python3 usage_report.py                          # 近 7 天，按天
   python3 usage_report.py --days 30 --by model     # 近 30 天，按模型
-  python3 usage_report.py --days 0 --by project    # 全量历史，按项目
+  python3 usage_report.py --days all --by project   # 全量历史，按项目
   python3 usage_report.py --days 7 --json          # 输出 JSON（供程序消费）
+  python3 usage_report.py --since 2026-09-01 --until 2026-09-15  # 自定义日期范围
+  python3 usage_report.py --by session --days 7    # 按会话聚合
 
 费用换算：读取同技能目录下的 pricing.json（元 / 百万 tokens，分输入/输出/缓存三项）。
 未配置单价的模型只统计 token，费用列显示 "-"。
@@ -73,27 +75,67 @@ PRICING_DEFAULT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "pricing.json"
 TZ = timezone(timedelta(hours=8))  # 北京时间
 UNKNOWN_MODEL = "(未记录)"
 
+# 共享脚注（build_dashboard.py / build_canvas.py 也引用）
+FOOTNOTES = [
+    "费用为参考估算：单价取自各模型官网（2026-09-23 获取），DeepSeek 系列已按消息时间自动区分高峰/空闲时段。",
+    "自定义模型（custom_model）在本地库不区分具体型号，费用按其主力模型 DeepSeek-Flash 计价；切换参考模型见 pricing.json 的 _otherCustomModels。",
+    "Qoder 官方档位无公开单价（官方额度以 Credits 口径为准），其 Token 计入总量但费用不计入。",
+    "数据源为 Qoder 本地 chat_message 表的一次只读快照，页面数据不自动更新；刷新数据请重新运行生成脚本。",
+]
+
+
+def _parse_days(s):
+    """解析 --days 参数：支持整数 N 或 'all'（等同于 0 = 全部历史）。"""
+    if isinstance(s, str) and s.strip().lower() == "all":
+        return 0
+    try:
+        return int(s)
+    except (ValueError, TypeError):
+        raise argparse.ArgumentTypeError(f"--days 应为非负整数或 'all'，得到: {s!r}")
+
+
+def _parse_date(s):
+    """解析 YYYY-MM-DD 日期字符串为毫秒时间戳（北京时间 00:00:00）。"""
+    try:
+        dt = datetime.strptime(s.strip(), "%Y-%m-%d").replace(tzinfo=TZ)
+        return int(dt.timestamp() * 1000)
+    except (ValueError, TypeError):
+        raise argparse.ArgumentTypeError(f"日期格式应为 YYYY-MM-DD，得到: {s!r}")
+
 
 def parse_args():
     p = argparse.ArgumentParser(description="Qoder token 消费统计（官方模型 + 自定义模型）")
-    p.add_argument("--days", type=int, default=7, help="统计近 N 天；0 = 全部历史（默认 7）")
-    p.add_argument("--by", choices=["day", "model", "project"], default="day", help="聚合维度（默认 day）")
-    p.add_argument("--db", default=DB_DEFAULT, help="Qoder 本地数据库路径（默认自动跨平台定位；可用环境变量 QODER_DB_PATH 覆盖）")
+    p.add_argument("--days", type=_parse_days, default=7,
+                       help="统计近 N 天；0 或 'all' = 全部历史（默认 7）")
+    p.add_argument("--by", choices=["day", "model", "project", "session"], default="day",
+                       help="聚合维度（默认 day）")
+    p.add_argument("--since", type=_parse_date, default=None, metavar="YYYY-MM-DD",
+                       help="起始日期（含），与 --days 互斥")
+    p.add_argument("--until", type=_parse_date, default=None, metavar="YYYY-MM-DD",
+                       help="截止日期（含，当日 23:59:59），与 --days 互斥")
+    p.add_argument("--db", default=DB_DEFAULT,
+                       help="Qoder 本地数据库路径（默认自动跨平台定位；可用环境变量 QODER_DB_PATH 覆盖）")
     p.add_argument("--pricing", default=PRICING_DEFAULT, help="单价表路径（默认技能目录下 pricing.json）")
-    p.add_argument("--top", type=int, default=50, help="model/project 维度的最大行数（默认 50）")
+    p.add_argument("--top", type=int, default=50, help="model/project/session 维度的最大行数（默认 50）")
     p.add_argument("--json", action="store_true", help="输出 JSON 而非 markdown")
-    return p.parse_args()
+    args = p.parse_args()
+    if (args.since is not None or args.until is not None) and args.days != 7:
+        p.error("--since/--until 与 --days 互斥，请只选一种方式")
+    return args
 
 
 def load_pricing(path):
-    """返回 (models_map, currency)。文件缺失或损坏时返回空映射（仅统计 token）。"""
+    """返回 (models_map, currency, exchange_rate)。文件缺失或损坏时返回空映射（仅统计 token）。"""
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
         models = data.get("models") or {}
-        return {k: v for k, v in models.items() if isinstance(v, dict)}, data.get("currency", "CNY")
+        rate = data.get("_exchangeRate")
+        if not isinstance(rate, (int, float)) or rate <= 0:
+            rate = None
+        return {k: v for k, v in models.items() if isinstance(v, dict)}, data.get("currency", "CNY"), rate
     except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return {}, "CNY"
+        return {}, "CNY", None
 
 
 def _parse_rates(d):
@@ -107,17 +149,45 @@ def _parse_rates(d):
     return {"input": float(inp), "output": float(out), "cached": float(cac)}
 
 
+class PriceCache:
+    """模型价格规则缓存：同一模型只解析一次。"""
+
+    def __init__(self, pricing):
+        self._pricing = pricing
+        self._cache = {}
+
+    def get(self, key):
+        """返回该模型的计价规则：{'flat': {...}} 或 {'peak': {...}, 'offpeak': {...}}；未配置返回 None。"""
+        if key in self._cache:
+            return self._cache[key]
+        p = self._pricing.get(key)
+        if not p:
+            self._cache[key] = None
+            return None
+        if isinstance(p.get("peak"), dict) or isinstance(p.get("offpeak"), dict):
+            peak, off = _parse_rates(p.get("peak")), _parse_rates(p.get("offpeak"))
+            peak, off = peak or off, off or peak
+            result = {"peak": peak, "offpeak": off} if peak else None
+        else:
+            flat = _parse_rates(p)
+            result = {"flat": flat} if flat else None
+        self._cache[key] = result
+        return result
+
+    def label(self, key):
+        p = self._pricing.get(key) or {}
+        return p.get("display_name") or key
+
+
+# 兼容旧接口：保留函数式 model_price / model_label 供外部直接调用
+_default_cache = None
+
+
 def model_price(pricing, key):
-    """返回该模型的计价规则：{'flat': {...}} 或 {'peak': {...}, 'offpeak': {...}}；未配置返回 None。"""
-    p = pricing.get(key)
-    if not p:
-        return None
-    if isinstance(p.get("peak"), dict) or isinstance(p.get("offpeak"), dict):
-        peak, off = _parse_rates(p.get("peak")), _parse_rates(p.get("offpeak"))
-        peak, off = peak or off, off or peak
-        return {"peak": peak, "offpeak": off} if peak else None
-    flat = _parse_rates(p)
-    return {"flat": flat} if flat else None
+    global _default_cache
+    if _default_cache is None or _default_cache._pricing is not pricing:
+        _default_cache = PriceCache(pricing)
+    return _default_cache.get(key)
 
 
 def model_label(pricing, key):
@@ -142,52 +212,91 @@ def message_cost(price, pt, ct, cd, gmt_ms):
             + ct / 1e6 * unit["output"])
 
 
-def fetch_usage(db_path, since_ms):
-    """读取全部 token 记录。返回 (project_map, rows)；rows=(gmt_create, token_info, model_info, session_id)。"""
+def resolve_range(args):
+    """根据参数计算 (since_ms, until_ms, range_label)。"""
+    if args.since is not None or args.until is not None:
+        since_ms = args.since
+        # until 为当日 23:59:59.999
+        until_ms = (args.until + 86400000 - 1) if args.until else None
+        since_s = datetime.fromtimestamp(since_ms / 1000, tz=TZ).strftime("%Y-%m-%d") if since_ms else "最早"
+        until_s = datetime.fromtimestamp(args.until / 1000, tz=TZ).strftime("%Y-%m-%d") if args.until else "至今"
+        return since_ms, until_ms, f"{since_s} ~ {until_s}"
+    since_ms = None
+    if args.days > 0:
+        since_ms = int((datetime.now(tz=TZ) - timedelta(days=args.days)).timestamp() * 1000)
+    range_label = f"近 {args.days} 天" if args.days > 0 else "全部历史"
+    return since_ms, None, range_label
+
+
+def fetch_usage(db_path, since_ms, until_ms=None):
+    """读取全部 token 记录。返回 (project_map, session_map, rows)。
+
+    rows = (gmt_create, prompt_tokens, completion_tokens, cached_tokens, model_key, session_id)
+    利用 SQLite JSON1 扩展在 SQL 层提取字段，避免 Python 侧逐行 json.loads。
+    """
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=15)
     try:
         # session_id -> 项目名映射（供 project 维度）
         project_map = {}
+        session_map = {}  # session_id -> session 标题（供 session 维度）
         for sid, name in conn.execute("SELECT session_id, project_name FROM chat_session"):
             project_map[sid] = (name or "").strip() or "(未命名项目)"
+        # 尝试获取 session 标题（如果表中有 title/name 字段）
+        try:
+            for sid, title in conn.execute(
+                "SELECT session_id, COALESCE(NULLIF(TRIM(title), ''), NULLIF(TRIM(name), ''), session_id) FROM chat_session"
+            ):
+                session_map[sid] = title or sid
+        except sqlite3.OperationalError:
+            # title/name 列不存在时，session 维度退化为 session_id
+            for sid in project_map:
+                session_map[sid] = sid
 
+        # SQL 侧用 JSON1 提取 token 字段，避免 Python 逐行解析；
+        # CASE WHEN 包裹 json_extract 防止非法 JSON 行导致查询失败
         sql = (
-            "SELECT gmt_create, token_info, model_info, session_id FROM chat_message "
-            "WHERE token_info IS NOT NULL AND token_info <> ''"
+            "SELECT gmt_create,"
+            " CASE WHEN json_valid(token_info) THEN COALESCE(CAST(json_extract(token_info, '$.prompt_tokens') AS INTEGER), 0) ELSE 0 END,"
+            " CASE WHEN json_valid(token_info) THEN COALESCE(CAST(json_extract(token_info, '$.completion_tokens') AS INTEGER), 0) ELSE 0 END,"
+            " CASE WHEN json_valid(token_info) THEN COALESCE(CAST(json_extract(token_info, '$.cached_tokens') AS INTEGER), 0) ELSE 0 END,"
+            " CASE WHEN model_info IS NOT NULL AND model_info <> '' AND json_valid(model_info) THEN COALESCE(json_extract(model_info, '$.model_key'), '') ELSE '' END,"
+            " session_id"
+            " FROM chat_message"
+            " WHERE token_info IS NOT NULL AND token_info <> ''"
         )
         params = []
         if since_ms:
             sql += " AND gmt_create >= ?"
             params.append(since_ms)
+        if until_ms:
+            sql += " AND gmt_create <= ?"
+            params.append(until_ms)
         rows = conn.execute(sql, params).fetchall()
     finally:
         conn.close()
-    return project_map, rows
+    return project_map, session_map, rows
 
 
-def aggregate(rows, by, project_map, pricing):
+def aggregate(rows, by, project_map, pricing, session_map=None):
+    """聚合 token 记录。buckets: key -> {msgs, prompt, completion, cached, cost, missing}"""
+    price_cache = PriceCache(pricing) if not isinstance(pricing, PriceCache) else pricing
     buckets = {}
 
     def new_bucket():
         return {"msgs": 0, "prompt": 0, "completion": 0, "cached": 0, "cost": 0.0, "missing": set()}
 
-    for gmt, token_info, model_info, session_id in rows:
-        try:
-            tk = json.loads(token_info)
-        except (TypeError, json.JSONDecodeError):
-            continue
-        pt = int(tk.get("prompt_tokens") or 0)
-        ct = int(tk.get("completion_tokens") or 0)
-        cd = int(tk.get("cached_tokens") or 0)
-        try:
-            mk = json.loads(model_info).get("model_key") or UNKNOWN_MODEL
-        except (TypeError, json.JSONDecodeError):
-            mk = UNKNOWN_MODEL
+    for gmt, pt, ct, cd, mk, session_id in rows:
+        pt = int(pt or 0)
+        ct = int(ct or 0)
+        cd = int(cd or 0)
+        mk = mk or UNKNOWN_MODEL
 
         if by == "day":
             key = datetime.fromtimestamp((gmt or 0) / 1000, tz=TZ).strftime("%Y-%m-%d")
         elif by == "model":
             key = mk
+        elif by == "session":
+            key = (session_map or {}).get(session_id, session_id or "(未知会话)")
         else:
             key = project_map.get(session_id, "(未知项目)")
 
@@ -196,7 +305,7 @@ def aggregate(rows, by, project_map, pricing):
         b["prompt"] += pt
         b["completion"] += ct
         b["cached"] += cd
-        price = model_price(pricing, mk)
+        price = price_cache.get(mk)
         if price is None:
             b["missing"].add(mk)
         else:
@@ -238,7 +347,7 @@ def fmt_cost(cost, currency):
 
 
 def render_markdown(args, rows, missing, pricing, range_label, currency):
-    dim = {"day": "日期", "model": "模型", "project": "项目"}[args.by]
+    dim = {"day": "日期", "model": "模型", "project": "项目", "session": "会话"}[args.by]
     lines = [
         f"# Qoder Token 消费统计（{range_label}）",
         "",
@@ -273,14 +382,11 @@ def main():
     args = parse_args()
     require_db(args.db)
 
-    pricing, currency = load_pricing(args.pricing)
-    since_ms = None
-    if args.days > 0:
-        since_ms = int((datetime.now(tz=TZ) - timedelta(days=args.days)).timestamp() * 1000)
-    range_label = f"近 {args.days} 天" if args.days > 0 else "全部历史"
+    pricing, currency, _exchange_rate = load_pricing(args.pricing)
+    since_ms, until_ms, range_label = resolve_range(args)
 
-    project_map, rows = fetch_usage(args.db, since_ms)
-    buckets = aggregate(rows, args.by, project_map, pricing)
+    project_map, session_map, rows = fetch_usage(args.db, since_ms, until_ms)
+    buckets = aggregate(rows, args.by, project_map, pricing, session_map=session_map)
     result_rows, missing = build_result(args, buckets, pricing)
 
     if args.json:

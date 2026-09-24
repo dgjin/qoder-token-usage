@@ -1,6 +1,6 @@
 ---
 name: token-usage
-version: 0.3.2
+version: 0.4.0
 description: 统计 Qoder 桌面端的 token 消费计量——同时覆盖 Qoder 官方模型额度与自定义模型（BYOK / custom_model）。数据来自 Qoder 本地数据库（每条消息的 token 明细：输入/输出/缓存命中），支持按天、按模型、按项目聚合，可按 pricing.json 中内置的国产 + 国际模型官网单价换算参考费用，并一键自动更新官网价（update_pricing.py），可生成可视化 HTML 仪表盘与 Qoder IDE 内 Canvas 仪表盘，并提供 /token-usage 斜杠命令在任意工作区一键刷新。Use when the user asks about Qoder token 消费/用量统计（含自定义模型）, "我这周用了多少 token", token usage / token cost / credits 消耗报告, 统计 token 消费, 查看用量, custom model 用量, 可视化查看用量/账单, 更新模型价格, 或需要导出用量报表与仪表盘时。
 description_zh: 统计 Qoder 桌面端 token 消费（官方模型 + 自定义模型），支持费用换算（内置 30 款国产 + 国际模型官网价、可自动更新）、可视化 HTML 仪表盘与 IDE 内 Canvas 仪表盘，任意工作区可用 /token-usage 与 /update-pricing 斜杠命令。
 user-invocable: true
@@ -35,17 +35,21 @@ user-invocable: true
 python3 scripts/usage_report.py                      # 近 7 天，按天
 python3 scripts/usage_report.py --days 30 --by model # 近 30 天，按模型
 python3 scripts/usage_report.py --days 30 --by project  # 按项目
-python3 scripts/usage_report.py --days 0 --by day    # 全部历史
+python3 scripts/usage_report.py --days all --by day  # 全部历史
 python3 scripts/usage_report.py --days 7 --json      # 结构化输出（供程序消费）
+python3 scripts/usage_report.py --since 2026-09-01 --until 2026-09-15  # 自定义日期范围
+python3 scripts/usage_report.py --by session --days 7  # 按会话聚合
 ```
 
 常用参数：
 
 | 参数 | 说明 |
 |---|---|
-| `--days N` | 统计近 N 天；`0` = 全部历史（默认 7） |
-| `--by day\|model\|project` | 聚合维度（默认 day） |
-| `--top N` | model/project 维度的最大行数（默认 50） |
+| `--days N` | 统计近 N 天；`0` 或 `all` = 全部历史（默认 7） |
+| `--by day\|model\|project\|session` | 聚合维度（默认 day） |
+| `--since YYYY-MM-DD` | 起始日期（含），与 `--days` 互斥 |
+| `--until YYYY-MM-DD` | 截止日期（含），与 `--days` 互斥 |
+| `--top N` | model/project/session 维度的最大行数（默认 50） |
 | `--json` | 输出 JSON 而非 markdown |
 | `--db PATH` | 覆盖数据库路径（默认跨平台自动探测，亦可用环境变量 `QODER_DB_PATH`） |
 | `--pricing PATH` | 覆盖单价表路径（默认技能目录下 pricing.json） |
@@ -131,7 +135,9 @@ python3 scripts/update_pricing.py --offline # 完全不联网
 | 统计我这周的 token 消费 | `python3 scripts/usage_report.py --days 7` |
 | 自定义模型用了多少 | `python3 scripts/usage_report.py --days 30 --by model`（看 `自定义模型` 行） |
 | 哪个项目最费 | `python3 scripts/usage_report.py --days 30 --by project` |
-| 全部历史总账 | `python3 scripts/usage_report.py --days 0` |
+| 全部历史总账 | `python3 scripts/usage_report.py --days all` |
+| 指定日期范围 | `python3 scripts/usage_report.py --since 2026-09-01 --until 2026-09-15` |
+| 哪次对话最费 | `python3 scripts/usage_report.py --days 30 --by session` |
 | 可视化查看 / 看图表 / 仪表盘（浏览器） | `python3 scripts/build_dashboard.py --open` |
 | 在 IDE 内打开仪表盘（Canvas 面板） | 首选斜杠命令 `/token-usage`；或 `python3 scripts/build_canvas.py --workspace <当前工作区>`，再把 canvas 路径以 Markdown 链接返回给用户点击打开 |
 | 换算成钱 | 先确认 `pricing.json` 单价已配置，再重跑 |

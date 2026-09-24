@@ -152,7 +152,9 @@ def validate_pricing(data):
 
 
 def fetch(url):
-    """下载文本；返回 (text, 源短名)。超限或非 UTF-8 会抛异常。"""
+    """下载文本；返回 (text, 源短名)。超限或非 UTF-8 会抛异常。仅允许 https:// 协议。"""
+    if not url.startswith("https://"):
+        raise ValueError(f"仅允许 https:// 协议的更新源，得到: {url.split('://')[0]}://")
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json, text/plain, */*"})
     with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:  # 自动跟随 30x
         size = resp.headers.get("Content-Length")
@@ -210,8 +212,30 @@ def flatten_rates(data):
     return out
 
 
+def flatten_meta(data):
+    """展平元数据 {(section, key): {display_name, note}}，用于比对非价格变更。"""
+    out = {}
+    for section in ("models", "_otherCustomModels"):
+        sec = data.get(section) or {}
+        if not isinstance(sec, dict):
+            continue
+        for key, val in sec.items():
+            if isinstance(key, str) and key.startswith("_"):
+                continue
+            if not isinstance(val, dict):
+                continue
+            meta = {}
+            for fld in ("display_name", "note"):
+                v = val.get(fld)
+                if v is not None:
+                    meta[fld] = v
+            if meta:
+                out[(section, key)] = meta
+    return out
+
+
 def diff_summary(local, remote):
-    """返回人类可读的变更列表（新增 / 删除 / 价格变化）。"""
+    """返回人类可读的变更列表（新增 / 删除 / 价格变化 / 元数据变更）。"""
     lmap, rmap = flatten_rates(local), flatten_rates(remote)
     lines = []
     for key in sorted(set(rmap) - set(lmap)):
@@ -226,6 +250,15 @@ def diff_summary(local, remote):
             old_s = "/".join("-" if v is None else f"{v:g}" for v in lmap[key])
             new_s = "/".join("-" if v is None else f"{v:g}" for v in rmap[key])
             lines.append(f"  ~ {name} [{slot}]: {old_s} → {new_s}")
+    # 元数据变更（display_name / note）
+    lmeta, rmeta = flatten_meta(local), flatten_meta(remote)
+    for key in sorted(set(lmeta) & set(rmeta)):
+        lm, rm = lmeta[key], rmeta[key]
+        for fld in sorted(set(lm) | set(rm)):
+            lv, rv = lm.get(fld), rm.get(fld)
+            if lv != rv:
+                section, name = key
+                lines.append(f"  ~ {name} [{fld}]: {lv or '(空)'} → {rv or '(空)'}")
     return lines
 
 

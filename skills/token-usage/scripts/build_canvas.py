@@ -19,6 +19,7 @@ KPI / 每日 Token 堆叠柱 / 每日费用折线 / 模型分布 / 项目排行 
   python3 build_canvas.py                                      # 取 CWD 作为目标工作区
   python3 build_canvas.py --workspace /path/to/current-project # 显式指定（推荐）
   python3 build_canvas.py --out /tmp/x.canvas.tsx
+  python3 build_canvas.py --top-projects 20                    # 自定义项目排行条数
 """
 import argparse
 import json
@@ -39,15 +40,10 @@ WORKSPACE_DEFAULT = os.environ.get("QODER_WORKSPACE") or os.getcwd()
 QODER_PROJECTS = os.path.expanduser("~/.qoder/projects")
 CANVAS_NAME = "token-usage-dashboard.canvas.tsx"
 RANGES = [("7", "近 7 天", 7), ("30", "近 30 天", 30), ("90", "近 90 天", 90), ("all", "全部历史", 0)]
-TOP_PROJECTS = 15
+TOP_PROJECTS_DEFAULT = 15
 
-FOOTNOTES = [
-    "费用为参考估算：单价取自各模型官网（2026-09-23 获取）；DeepSeek 系列按消息时间自动区分高峰/空闲时段。",
-    "自定义模型（custom_model）在本地库不区分具体型号，费用按其主力模型 DeepSeek-Flash 计价；切换参考模型见 pricing.json 的 _otherCustomModels。",
-    "Qoder 官方档位无公开单价，其 Tokens 计入总量但参考费用显示为 —（官方额度以 Credits 口径为准）。",
-    "数据为 Qoder 本地 chat_message 表的一次只读快照，不自动更新；点击「刷新数据」或在 Chat 中说「刷新 token 用量 Canvas 仪表盘」即可重新生成。",
-    "范围切换偏好由 Qoder Canvas 主动记忆，重新打开时保持上次选择。",
-]
+# 脚注统一从 usage_report 模块引用，避免多处维护不同步
+FOOTNOTES = ur.FOOTNOTES
 
 
 def parse_args():
@@ -60,6 +56,8 @@ def parse_args():
         help="目标工作区路径（默认取 $QODER_WORKSPACE 或当前工作目录，用于推导 Qoder 项目画布目录）",
     )
     p.add_argument("--out", default=None, help="输出 .canvas.tsx 路径（默认写入工作区对应的 canvases 目录）")
+    p.add_argument("--top-projects", type=int, default=TOP_PROJECTS_DEFAULT,
+                       help=f"项目排行最大条数（默认 {TOP_PROJECTS_DEFAULT}）")
     return p.parse_args()
 
 
@@ -103,9 +101,9 @@ def build_days(rows, pricing):
     return pts, base
 
 
-def build_dim(rows, by, project_map, pricing, top, range_total):
+def build_dim(rows, by, project_map, pricing, top, range_total, session_map=None):
     """按模型 / 项目聚合，返回 (行列表, 无单价模型列表, 自定义模型合计 tokens)。"""
-    buckets = ur.aggregate(rows, by, project_map, pricing)
+    buckets = ur.aggregate(rows, by, project_map, pricing, session_map=session_map)
     result, missing = ur.build_result(SimpleNamespace(by=by, top=top), buckets, pricing)
     out, custom_total = [], 0
     for r in result:
@@ -124,11 +122,11 @@ def build_dim(rows, by, project_map, pricing, top, range_total):
     return out, missing, custom_total
 
 
-def build_range(rows, project_map, pricing, rid, label):
+def build_range(rows, project_map, session_map, pricing, rid, label, top_projects=TOP_PROJECTS_DEFAULT):
     """组装单个时间范围的完整 payload。"""
     days, base = build_days(rows, pricing)
-    models, missing, custom_total = build_dim(rows, "model", project_map, pricing, 30, base["total"])
-    projects, _, _ = build_dim(rows, "project", project_map, pricing, TOP_PROJECTS, base["total"])
+    models, missing, custom_total = build_dim(rows, "model", project_map, pricing, 30, base["total"], session_map=session_map)
+    projects, _, _ = build_dim(rows, "project", project_map, pricing, top_projects, base["total"], session_map=session_map)
     return {
         "id": rid,
         "label": label,
@@ -154,8 +152,8 @@ def main():
         print(f"未找到模板文件：{TEMPLATE}", file=sys.stderr)
         sys.exit(1)
 
-    pricing, currency = ur.load_pricing(args.pricing)
-    project_map, rows = ur.fetch_usage(args.db, None)  # 全量读取一次，各范围内存切片
+    pricing, currency, _exchange_rate = ur.load_pricing(args.pricing)
+    project_map, session_map, rows = ur.fetch_usage(args.db, None)  # 全量读取一次，各范围内存切片
     now = datetime.now(tz=ur.TZ)
 
     ranges = []
@@ -165,7 +163,7 @@ def main():
             sub = [r for r in rows if (r[0] or 0) >= since_ms]
         else:
             sub = rows
-        ranges.append(build_range(sub, project_map, pricing, rid, label))
+        ranges.append(build_range(sub, project_map, session_map, pricing, rid, label, top_projects=args.top_projects))
 
     payload = {
         "generatedAt": now.strftime("%Y-%m-%d %H:%M"),

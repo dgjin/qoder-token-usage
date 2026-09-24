@@ -178,7 +178,7 @@ function compact(n) {
   n = n || 0;
   if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, '') + ' 亿';
   if (n >= 1e4) return (n / 1e4).toFixed(1).replace(/\.0$/, '') + ' 万';
-  return String(Math.round(n));
+  return fmt(Math.round(n));
 }
 function money(c) {
   if (c == null) return '—';
@@ -332,6 +332,29 @@ const modelColor = r =>
   r.key === '(未记录)' ? '#4b5568' : 'linear-gradient(90deg,#2563eb,#4c8dff)';
 const projectColor = () => 'linear-gradient(90deg,#4c8dff,#22d3ee)';
 
+/* ---------- CSV 导出 ---------- */
+function exportCsv() {
+  const rng = curRng(), rows = rng[state.dim] || [];
+  const dimName = DIM_NAMES[state.dim];
+  const header = [dimName, '消息数', '输入 Tokens', '输出 Tokens', '缓存 Tokens', '合计 Tokens', '参考费用'];
+  const csvRows = [header.join(',')];
+  const totalAll = rows.reduce((s, r) => s + r.total, 0) || 1;
+  rows.forEach(r => {
+    const line = [
+      '"' + String(r.label).replace(/"/g, '""') + '"',
+      r.msgs, r.prompt, r.completion, r.cached, r.total,
+      r.cost != null ? r.cost.toFixed(2) : ''
+    ].join(',');
+    csvRows.push(line);
+  });
+  const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'qoder-token-' + state.dim + '-' + rng.id + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 /* ---------- 渲染：明细表 ---------- */
 function renderTable() {
   const rng = curRng(), rows = rng[state.dim] || [];
@@ -369,8 +392,10 @@ function init() {
     '<button data-id="' + r.id + '">' + esc(r.label) + '</button>').join('');
   $('rangeTabs').querySelectorAll('button').forEach(b => b.onclick = () => { state.range = b.dataset.id; renderAll(); });
   $('dimTabs').innerHTML = ['day', 'model', 'project'].map(d =>
-    '<button data-d="' + d + '">按' + DIM_NAMES[d] + '</button>').join('');
-  $('dimTabs').querySelectorAll('button').forEach(b => b.onclick = () => { state.dim = b.dataset.d; renderTable(); renderTabs(); });
+    '<button data-d="' + d + '">按' + DIM_NAMES[d] + '</button>').join('') +
+    '<button id="btnCsv" style="margin-left:8px;color:var(--muted2)">导出 CSV</button>';
+  $('dimTabs').querySelectorAll('button[data-d]').forEach(b => b.onclick = () => { state.dim = b.dataset.d; renderTable(); renderTabs(); });
+  $('btnCsv').onclick = exportCsv;
   renderAll();
 }
 init();

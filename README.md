@@ -2,7 +2,7 @@
 
 > Qoder 桌面端 token 消费计量插件：同时覆盖 **Qoder 官方模型** 与 **自定义模型（BYOK / custom_model）**，支持按天 / 模型 / 项目聚合、官网价费用换算（**可自动更新最新官网价**），一键生成 **可视化 HTML 仪表盘** 与 **IDE 内 Canvas 仪表盘**，并在任意工作区提供 `/token-usage` 与 `/update-pricing` 斜杠命令。
 
-- 版本 0.3.3 ｜ 许可 MIT ｜ 运行环境 Python 3.8+（仅标准库，无第三方依赖）
+- 版本 0.4.0 ｜ 许可 MIT ｜ 运行环境 Python 3.8+（仅标准库，无第三方依赖）
 - 支持 Qoder 桌面端：macOS / Windows / Linux
 
 ## 为什么需要它
@@ -126,6 +126,7 @@ Windows 上将 `python3` 换成 `python` 或 `py -3`。
 
 ## 更新记录
 
+- 0.4.0（2026-09-24）：性能与功能增强——SQL 侧 JSON1 聚合（大数据量性能提升）；`--since`/`--until` 自定义日期范围；`--by session` 会话维度聚合；`--days all` 别名；价格规则缓存（PriceCache）；汇率集中配置（`_exchangeRate`）；HTML 仪表盘 CSV 导出按钮；脚注统一引用；`--top-projects` 可配置；update_pricing URL scheme 白名单与 diff 元数据比对。
 - 0.3.3（2026-09-24）：插件图标精修（logo-generator skill 迭代）——剔除底色灰浑来源：移除 2 处环境光斑与主柱柔光层；金币焦点光晕收窄（stdDeviation 6→4、opacity 0.26→0.22）；币面内环增强（0.25/1.2 → 0.3/1.3）、¥ 符号线宽加粗（2.2→2.6），小尺寸下更清晰锐利；视觉结构（底板/边框/三柱/金币）保持不变。
 - 0.3.2（2026-09-23）：修复中文（非 ASCII）工作区路径下 Canvas 画布写入目录与 Qoder 客户端不一致的问题——Qoder 客户端把工作区路径中所有非字母数字字符替换为 `-`，旧版脚本只替换 `/`（保留中文），两套规则分裂导致画布写入错误目录、点击画布链接报「文件不存在或无法访问。」；现统一为 `[^a-zA-Z0-9] → -` 规则（ASCII 路径行为不变）。
 - 0.3.1（2026-09-23）：扩充国际模型参考价——`_otherCustomModels` 备选参考价由 18 款增至 30 款，新增 OpenAI（GPT-6 Astra / Sol / Luna、GPT-5.3 Codex）、Anthropic（Fable 5.1 / Opus 5.5 / Sonnet 5 / Haiku 4.5）、Google（Gemini 3.8 Flash / 3.1 Pro Preview）、xAI（Grok 4.7 / Build 0.1）共 12 款；国际厂商为美元官网价（note 内标注原价），按参考汇率 6.70 折算，价格均经官网复核（2026-09-23）。

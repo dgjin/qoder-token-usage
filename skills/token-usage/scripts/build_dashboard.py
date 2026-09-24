@@ -40,12 +40,8 @@ def _default_out():
 OUT_DEFAULT = _default_out()
 RANGES = [("7", "近 7 天", 7), ("30", "近 30 天", 30), ("90", "近 90 天", 90), ("all", "全部历史", 0)]
 
-FOOTNOTES = [
-    "费用为参考估算：单价取自各模型官网（2026-09-23 获取），DeepSeek 系列已按消息时间自动区分高峰/空闲时段。",
-    "自定义模型（custom_model）在本地库不区分具体型号，费用按其主力模型 DeepSeek-Flash 计价；切换参考模型见 pricing.json 的 _otherCustomModels。",
-    "Qoder 官方档位无公开单价（官方额度以 Credits 口径为准），其 Token 计入总量但费用不计入。",
-    "数据源为 Qoder 本地 chat_message 表的一次只读快照，页面数据不自动更新；刷新数据请重新运行生成脚本。",
-]
+# 脚注统一从 usage_report 模块引用，避免多处维护不同步
+FOOTNOTES = ur.FOOTNOTES
 
 
 def parse_args():
@@ -57,11 +53,11 @@ def parse_args():
     return p.parse_args()
 
 
-def build_range_payload(rows, project_map, pricing, range_id, range_label):
+def build_range_payload(rows, project_map, session_map, pricing, range_id, range_label):
     """聚合单个时间范围：day/model/project 三个维度 + 汇总指标。"""
     rng = {"id": range_id, "label": range_label}
     for by, top in (("day", 400), ("model", 30), ("project", 30)):
-        buckets = ur.aggregate(rows, by, project_map, pricing)
+        buckets = ur.aggregate(rows, by, project_map, pricing, session_map=session_map)
         result, missing = ur.build_result(SimpleNamespace(by=by, top=top), buckets, pricing)
         rng[by] = result
         if by == "model":
@@ -94,18 +90,26 @@ def main():
         print(f"未找到模板文件：{TEMPLATE}", file=sys.stderr)
         sys.exit(1)
 
-    pricing, currency = ur.load_pricing(args.pricing)
-    project_map, rows = ur.fetch_usage(args.db, None)  # 全量读取一次，各范围内存切片
+    pricing, currency, _exchange_rate = ur.load_pricing(args.pricing)
+    project_map, session_map, rows = ur.fetch_usage(args.db, None)  # 全量读取一次，各范围内存切片
     now = datetime.now(tz=ur.TZ)
 
-    ranges = []
+    # 预计算各范围的时间阈值，避免重复计算
+    range_thresholds = []
     for rid, label, days in RANGES:
         if days > 0:
             since_ms = int((now - timedelta(days=days)).timestamp() * 1000)
+        else:
+            since_ms = None
+        range_thresholds.append((rid, label, since_ms))
+
+    ranges = []
+    for rid, label, since_ms in range_thresholds:
+        if since_ms:
             sub = [r for r in rows if (r[0] or 0) >= since_ms]
         else:
             sub = rows
-        ranges.append(build_range_payload(sub, project_map, pricing, rid, label))
+        ranges.append(build_range_payload(sub, project_map, session_map, pricing, rid, label))
 
     payload = {
         "generatedAt": now.strftime("%Y-%m-%d %H:%M"),
