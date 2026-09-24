@@ -86,6 +86,33 @@ Windows 上将 `python3` 换成 `python` 或 `py -3`。
 | 模板 | `skills/token-usage/scripts/canvas_template.tsx` | Canvas 模板（qoder/canvas SDK 组件） |
 | 价格表 | `skills/token-usage/pricing.json` | 官网参考价（峰谷 / flat 两种结构） |
 | 图标 | `assets/avatar.svg` | 插件 Logo |
+| 构建 | `Makefile` / `skills/token-usage/scripts/package.py` | 自动打包与本地安装 |
+
+## 开发构建
+
+```bash
+# 打包插件（输出 dist/token-usage-<version>.zip）
+make pack
+
+# 打包并安装到本地插件目录
+make install
+
+# 完整发布流程：清理 → 测试 → 打包 → 安装
+make release
+
+# 清理临时文件
+make clean
+
+# 运行测试
+make test
+```
+
+或直接运行打包脚本：
+
+```bash
+python3 skills/token-usage/scripts/package.py          # 打包
+python3 skills/token-usage/scripts/package.py --open   # 打包并打开 dist 目录
+```
 
 ## 数据源与口径
 
